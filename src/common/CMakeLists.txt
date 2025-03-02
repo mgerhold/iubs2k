@@ -20,4 +20,6 @@ target_link_system_libraries(
         magic_enum::magic_enum
         lib2k
         fmt::fmt
+        tl::expected
+        tl::optional
 )

@@ -36,8 +36,8 @@ struct MoveImmediateIntoRegister final {
 
     [[nodiscard]] static Instruction decode(std::span<std::byte const> buffer);
 
-    void format(std::ostream& os) const {
-        fmt::print(os, " - {} (0x{:08x}) into {}", immediate, immediate, register_);
+    [[nodiscard]] friend std::string format_as(MoveImmediateIntoRegister const& inst) {
+        return fmt::format(" - {} (0x{:08x}) into {}", inst.immediate, inst.immediate, inst.register_);
     }
 };
 
@@ -56,8 +56,8 @@ struct MoveImmediateIntoMemory final {
 
     [[nodiscard]] static Instruction decode(std::span<std::byte const> buffer);
 
-    void format(std::ostream& os) const {
-        fmt::print(os, " - {} (0x{:08x}) into {}", immediate, immediate, pointer);
+    [[nodiscard]] friend std::string format_as(MoveImmediateIntoMemory const& inst) {
+        return fmt::format(" - {} (0x{:08x}) into {}", inst.immediate, inst.immediate, inst.pointer);
     }
 };
 
@@ -117,24 +117,6 @@ public:
         }
         return Decoder<variant>::decode(opcode.value(), buffer);
     }
-
-    friend std::ostream& operator<<(std::ostream& os, Instruction const& instruction) {
-        fmt::print(
-            os,
-            "0x{:02x} - {}",
-            std::to_underlying(instruction.opcode()),
-            magic_enum::enum_name(instruction.opcode())
-        );
-        std::visit(
-            [&]<typename T>(T const& inst) {
-                if constexpr (requires { inst.format(os); }) {
-                    inst.format(os);
-                }
-            },
-            instruction
-        );
-        return os;
-    }
 };
 
 [[nodiscard]] std::vector<Instruction> decode(std::span<std::byte const> memory);
@@ -149,7 +131,7 @@ public:
                 if constexpr (requires { format_as(inst); }) {
                     return format_as(inst);
                 } else {
-                    return "";
+                    return std::string{ "" };
                 }
             },
             instruction

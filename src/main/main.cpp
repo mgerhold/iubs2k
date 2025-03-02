@@ -1,27 +1,38 @@
 #include <fmt/format.h>
+#include <assembler/assembler.hpp>
 #include <cassert>
 #include <common/instruction.hpp>
 #include <common/pointer.hpp>
 #include <emulator/emulator.hpp>
 #include <gui/gui.hpp>
+#include <string_view>
 #include <vector>
 
 int main() {
-    auto const instructions = std::vector<Instruction>{
-        MoveImmediateIntoRegister{ 0, Register::A }, // copy 0x0, A
-        MoveImmediateIntoMemory{ 0x6C6C6548, *Register::A }, // copy 0x6C6C6548, *A ; "Hell"
-        MoveImmediateIntoRegister{ 4, Register::A }, // copy 0x4, A
-        MoveImmediateIntoMemory{ 0x77202C6F, *Register::A }, // copy 0x6C6C6548, *A ; "o, w"
-        MoveImmediateIntoRegister{ 8, Register::A }, // copy 0x8, A
-        MoveImmediateIntoMemory{ 0x646C726F, *Register::A }, // copy 0x646C726F, *A ; "orld"
-        MoveImmediateIntoRegister{ 12, Register::A }, // copy 0xB, A
-        MoveImmediateIntoMemory{ 0x00000021, *Register::A }, // copy 0x00000021, *A ; "!"
-        HaltAndCatchFire{}, // halt
-    };
-
+    using namespace std::string_view_literals;
+    static constexpr auto assembly = R"(
+copy 0, A
+copy 0x6C6C6548, *A ; "Hell"
+copy 4, A
+copy 0x77202C6F, *A ; "o, w"
+copy 8, A
+copy 0x646C726F, *A ; "orld"
+copy 12, A
+copy 0x00000021, *A ; "!"
+halt
+)"sv;
+    auto assembler = assembler::Assembler{ "test.asm", assembly };
     auto instruction_memory = std::vector<std::byte>{};
-    for (auto const& instruction : instructions) {
-        instruction.encode(std::back_inserter(instruction_memory));
+    while (true) {
+        auto const instruction = assembler.next_instruction();
+        if (not instruction.has_value()) {
+            if (std::holds_alternative<assembler::InputExhausted>(instruction.error())) {
+                break;
+            }
+            fmt::println(std::cerr, "Error: {}", instruction.error());
+            return EXIT_FAILURE;
+        }
+        instruction.value().encode(std::back_inserter(instruction_memory));
     }
 
     fmt::println("Decoded memory:");

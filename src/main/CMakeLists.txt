@@ -7,5 +7,6 @@ target_link_libraries(
         main
         PRIVATE
         emulator
+        assembler
         gui
 )

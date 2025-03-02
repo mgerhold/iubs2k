@@ -54,4 +54,9 @@ function(obpf_simulator_setup_dependencies)
             GITHUB_REPOSITORY SFML/SFML
             GIT_TAG 3.0.0
     )
+    CPMAddPackage(
+            NAME CTRE
+            GITHUB_REPOSITORY hanickadot/compile-time-regular-expressions
+            VERSION 3.9.0
+    )
 endfunction()
