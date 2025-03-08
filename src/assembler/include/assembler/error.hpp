@@ -1,6 +1,7 @@
 #pragma once
 
 #include <tl/expected.hpp>
+#include <tl/optional.hpp>
 #include <variant>
 #include "source_location.hpp"
 #include "token.hpp"
@@ -96,6 +97,28 @@ namespace assembler {
 
     class Error final : public ErrorBase {
         using ErrorBase::ErrorBase;
+
+    public:
+        [[nodiscard]] tl::optional<SourceLocation> source_location() const {
+            // clang-format off
+            return std::visit(
+                [](auto const& error) -> tl::optional<SourceLocation> {
+                    if constexpr (requires { { error.source_location } -> std::convertible_to<SourceLocation>; }) {
+                        return static_cast<SourceLocation>(error.source_location);
+                    } else if constexpr (requires { { error.source_location() } -> std::convertible_to<SourceLocation>; }) {
+                        return static_cast<SourceLocation>(error.source_location());
+                    } else if constexpr (requires { { error.mnemonic } -> std::convertible_to<Token>; }) {
+                        return static_cast<Token>(error.mnemonic).source_location();
+                    } else if constexpr (requires{ {error.token } -> std::convertible_to<Token>; } ) {
+                         return static_cast<Token>(error.token).source_location();
+                    } else {
+                        return tl::nullopt;
+                    }
+                },
+                *this
+            );
+            // clang-format on
+        }
     };
 
     [[nodiscard]] inline std::string format_as(Error const& error) {

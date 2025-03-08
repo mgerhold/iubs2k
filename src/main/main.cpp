@@ -1,6 +1,7 @@
 #include <fmt/format.h>
 #include <assembler/assembler.hpp>
 #include <cassert>
+#include <iterator>
 #include <common/instruction.hpp>
 #include <common/pointer.hpp>
 #include <emulator/emulator.hpp>
@@ -29,7 +30,24 @@ halt
             if (std::holds_alternative<assembler::InputExhausted>(instruction.error())) {
                 break;
             }
-            fmt::println(std::cerr, "Error: {}", instruction.error());
+            if (auto const source_location = instruction.error().source_location()) {
+                auto const& location = source_location.value();
+                fmt::println(
+                    std::cerr,
+                    "{}:{}:{}: {}",
+                    location.filename(),
+                    location.row(),
+                    location.column(),
+                    instruction.error()
+                );
+                auto const num_digits = static_cast<int>(std::to_string(location.row()).length());
+                auto const surrounding_line = location.surrounding_line();
+                fmt::println(std::cerr, "{} | {}", location.row(), surrounding_line);
+                auto const offset = std::distance(surrounding_line.data(), location.lexeme().data());
+                fmt::println(std::cerr, "{:{}} | {:>{}}{:~>{}}^", "", num_digits, "", offset, "", location.lexeme().length() - 1);
+            } else {
+                fmt::println(std::cerr, "Error: {}", instruction.error());
+            }
             return EXIT_FAILURE;
         }
         instruction.value().encode(std::back_inserter(instruction_memory));

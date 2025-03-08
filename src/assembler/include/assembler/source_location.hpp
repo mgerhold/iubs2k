@@ -45,6 +45,15 @@ namespace assembler {
         [[nodiscard]] usize column() const {
             return m_column;
         }
+
+        [[nodiscard]] std::string_view surrounding_line() const {
+            auto const start = m_source.rfind('\n', m_offset);
+            auto const end = m_source.find('\n', m_offset);
+            if (start == std::string_view::npos) {
+                return m_source.substr(0, end);
+            }
+            return m_source.substr(start + 1, end - start - 1);
+        }
     };
 
     [[nodiscard]] inline std::string format_as(SourceLocation const& location) {
