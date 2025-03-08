@@ -16,15 +16,15 @@ namespace assembler {
 
     public:
         [[nodiscard]] SourceLocation(
-            std::string_view filename,
-            std::string_view source,
+            std::string_view const filename,
+            std::string_view const source,
             usize const offset,
             usize const length,
             usize const row,
             usize const column
         )
-            : m_filename{ std::move(filename) },
-              m_source{ std::move(source) },
+            : m_filename{ filename },
+              m_source{ source },
               m_offset{ offset },
               m_length{ length },
               m_row{ row },
