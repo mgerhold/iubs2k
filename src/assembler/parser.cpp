@@ -1,32 +1,46 @@
 #include "parser.hpp"
 
 namespace assembler {
-    [[nodiscard]] Parser::Parser(std::string_view const filename, std::string_view const source)
-        : m_lexer{ filename, source } {}
+    [[nodiscard]] Parser::Parser(std::vector<Token> tokens)
+        : m_tokens{ std::move(tokens) } {}
 
-    [[nodiscard]] tl::expected<Instruction, Error> Parser::next_instruction() {
+    [[nodiscard]] tl::expected<void, Error> Parser::parse() {
+        *this = Parser{ std::move(m_tokens) };
         while (true) {
-            if (not current().has_value()) {
-                return tl::unexpected{ current().error() };
+            while (current().type() == TokenType::Newline) {
+                advance();
             }
-            auto const token = current().value();
-            if (token.type() != TokenType::Newline) {
+            if (is_at_end()) {
                 break;
             }
-            if (auto const result = advance(); not result.has_value()) {
-                return tl::unexpected{ result.error() };
+            auto instruction = this->instruction();
+            if (not instruction.has_value()) {
+                return tl::unexpected{ instruction.error() };
             }
+            m_instructions.push_back(std::move(instruction).value());
         }
-        auto const token = current().value();
-        switch (token.type()) {
+        return {};
+    }
+
+    [[nodiscard]] std::vector<Instruction> Parser::take() && {
+        return std::move(m_instructions);
+    }
+
+    [[nodiscard]] tl::expected<Instruction, Error> Parser::instruction() {
+        while (true) {
+            if (current().type() != TokenType::Newline) {
+                break;
+            }
+            advance();
+        }
+        switch (current().type()) {
             using enum TokenType;
             case EndOfInput:
+                // TODO: Exchange with dedicated "unexpected end of input" error
                 return tl::unexpected{ InputExhausted{} };
             case Identifier: {
-                auto const mnemonic = token;
-                if (auto const result = advance(); not result.has_value()) {
-                    return tl::unexpected{ result.error() };
-                }
+                auto const mnemonic = current();
+                advance();
                 auto operands = this->operands();
                 if (not operands.has_value()) {
                     return tl::unexpected{ operands.error() };
@@ -35,47 +49,33 @@ namespace assembler {
             }
             default:
                 return tl::unexpected{
-                    UnexpectedToken{ token, "Expected identifier." }
+                    UnexpectedToken{ current(), "Expected identifier." }
                 };
         }
     }
 
-    [[nodiscard]] tl::expected<Token, Error> Parser::current() {
-        if (m_current.has_value()) {
-            return m_current.value();
-        }
-        auto const next = m_lexer.next_token();
-        if (not next.has_value()) {
-            return tl::unexpected{ next.error() };
-        }
-        m_current = next.value();
-        return m_current.value();
+    [[nodiscard]] bool Parser::is_at_end() const {
+        return m_index >= m_tokens.size() or m_tokens.at(m_index).type() == TokenType::EndOfInput;
     }
 
-    [[nodiscard]] tl::expected<void, Error> Parser::advance() {
-        if (auto const maybe_current = current(); not maybe_current.has_value()) {
-            return tl::unexpected{ maybe_current.error() };
+    [[nodiscard]] Token const& Parser::current() const {
+        if (is_at_end()) {
+            return m_tokens.at(m_tokens.size() - 1);
         }
-        if (current().value().type() == TokenType::EndOfInput) {
-            return {};
+        return m_tokens.at(m_index);
+    }
+
+    void Parser::advance() {
+        if (is_at_end()) {
+            return;
         }
-        auto const next = m_lexer.next_token();
-        if (not next.has_value()) {
-            return tl::unexpected{ next.error() };
-        }
-        m_current = next.value();
-        return {};
+        ++m_index;
     }
 
     [[nodiscard]] tl::expected<std::vector<std::unique_ptr<Operand>>, Error> Parser::operands() {
         auto operands = std::vector<std::unique_ptr<Operand>>{};
         while (true) {
-            auto token = current();
-            if (not token.has_value()) {
-                return tl::unexpected{ token.error() };
-            }
-
-            if (token.value().type() == TokenType::EndOfInput or token.value().type() == TokenType::Newline) {
+            if (current().type() == TokenType::EndOfInput or current().type() == TokenType::Newline) {
                 return operands;
             }
 
@@ -86,52 +86,34 @@ namespace assembler {
 
             operands.push_back(std::move(operand).value());
 
-            token = current();
-            if (not token.has_value()) {
-                return tl::unexpected{ token.error() };
-            }
-
-            if (token.value().type() != TokenType::Comma) {
+            if (current().type() != TokenType::Comma) {
                 return operands;
             }
 
-            if (auto const result = advance(); not result.has_value()) {
-                return tl::unexpected{ result.error() };
-            }
+            advance();
         }
     }
 
     [[nodiscard]] tl::expected<std::unique_ptr<Operand>, Error> Parser::operand() {
-        if (not current().has_value()) {
-            return tl::unexpected{ current().error() };
-        }
-        switch (current().value().type()) {
+        switch (current().type()) {
             case TokenType::Register: {
-                auto register_ = std::make_unique<Register>(current().value());
-                if (auto const result = advance(); not result.has_value()) {
-                    return tl::unexpected{ result.error() };
-                }
+                auto register_ = std::make_unique<Register>(current());
+                advance();
                 return register_;
             }
             case TokenType::Identifier: {
-                auto identifier = std::make_unique<Identifier>(current().value());
-                if (auto const result = advance(); not result.has_value()) {
-                    return tl::unexpected{ result.error() };
-                }
+                auto identifier = std::make_unique<Identifier>(current());
+                advance();
                 return identifier;
             }
             case TokenType::Integer: {
-                auto immediate = std::make_unique<Immediate>(current().value());
-                if (auto const result = advance(); not result.has_value()) {
-                    return tl::unexpected{ result.error() };
-                }
+                auto immediate = std::make_unique<Immediate>(current());
+                advance();
                 return immediate;
             }
             case TokenType::Asterisk: {
-                auto const asterisk = current().value();
-                if (auto const result = advance(); not result.has_value()) {
-                    return tl::unexpected{ result.error() };
-                }
+                auto const asterisk = current();
+                advance();
                 auto pointee = this->operand();
                 if (not pointee.has_value()) {
                     return tl::unexpected{ pointee.error() };
@@ -140,7 +122,7 @@ namespace assembler {
             }
             case TokenType::Comma:
                 return tl::unexpected{
-                    UnexpectedToken{ current().value(), "Expected operand." }
+                    UnexpectedToken{ current(), "Expected operand." }
                 };
             case TokenType::EndOfInput:
             case TokenType::Newline:

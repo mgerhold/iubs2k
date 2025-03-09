@@ -8,9 +8,29 @@ namespace assembler {
     [[nodiscard]] Lexer::Lexer(std::string_view const filename, std::string_view const source)
         : m_filename{ filename }, m_source{ source } {}
 
+    [[nodiscard]] tl::expected<void, Error> Lexer::tokenize() {
+        *this = Lexer{ m_filename, m_source };
+        while (true) {
+            auto const token = next_token();
+            if (not token.has_value()) {
+                return tl::unexpected{ token.error() };
+            }
+
+            m_tokens.push_back(token.value());
+            if (token.value().type() == TokenType::EndOfInput) {
+                break;
+            }
+        }
+        return {};
+    }
+
+    [[nodiscard]] std::vector<Token> Lexer::take() && {
+        return std::move(m_tokens);
+    }
+
     [[nodiscard]] tl::expected<Token, Error> Lexer::next_token() {
         if (m_input_exhausted) {
-            return tl::unexpected{ InputExhausted{} };
+            throw std::logic_error{ "Lexer is exhausted." };
         }
 
         if (is_at_end()) {

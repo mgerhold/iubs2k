@@ -10,18 +10,25 @@
 namespace assembler {
     class Parser final {
     private:
-        Lexer m_lexer;
-        tl::optional<Token> m_current;
+        std::vector<Token> m_tokens;
+        std::vector<Instruction> m_instructions;
+        usize m_index = 0;
 
     public:
-        [[nodiscard]] explicit Parser(std::string_view filename, std::string_view source);
+        [[nodiscard]] explicit Parser(std::vector<Token> tokens);
 
-        [[nodiscard]] tl::expected<Instruction, Error> next_instruction();
+        [[nodiscard]] tl::expected<void, Error> parse();
+
+        [[nodiscard]] std::vector<Instruction> take() &&;
 
     private:
-        [[nodiscard]] tl::expected<Token, Error> current();
+        [[nodiscard]] tl::expected<Instruction, Error> instruction();
 
-        [[nodiscard]] tl::expected<void, Error> advance();
+        [[nodiscard]] bool is_at_end() const;
+
+        [[nodiscard]] Token const& current() const;
+
+        void advance();
 
         [[nodiscard]] tl::expected<std::vector<std::unique_ptr<Operand>>, Error> operands();
 

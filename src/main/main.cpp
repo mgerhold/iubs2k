@@ -22,35 +22,31 @@ copy 12, A
 copy 0x00000021, *A ; "!"
 halt
 )"sv;
-    auto assembler = assembler::Assembler{ "test.asm", assembly };
-    auto instruction_memory = std::vector<std::byte>{};
-    while (true) {
-        auto const instruction = assembler.next_instruction();
-        if (not instruction.has_value()) {
-            if (std::holds_alternative<assembler::InputExhausted>(instruction.error())) {
-                break;
-            }
-            if (auto const source_location = instruction.error().source_location()) {
-                auto const& location = source_location.value();
-                fmt::println(
-                    std::cerr,
-                    "{}:{}:{}: {}",
-                    location.filename(),
-                    location.row(),
-                    location.column(),
-                    instruction.error()
-                );
-                auto const num_digits = static_cast<int>(std::to_string(location.row()).length());
-                auto const surrounding_line = location.surrounding_line();
-                fmt::println(std::cerr, "{} | {}", location.row(), surrounding_line);
-                auto const offset = std::distance(surrounding_line.data(), location.lexeme().data());
-                fmt::println(std::cerr, "{:{}} | {:>{}}{:~>{}}^", "", num_digits, "", offset, "", location.lexeme().length() - 1);
-            } else {
-                fmt::println(std::cerr, "Error: {}", instruction.error());
-            }
-            return EXIT_FAILURE;
+    auto const instructions = assembler::assemble("test.asm", assembly);
+    if (not instructions.has_value()) {
+        if (auto const source_location = instructions.error().source_location()) {
+            auto const& location = source_location.value();
+            fmt::println(
+                std::cerr,
+                "{}:{}:{}: {}",
+                location.filename(),
+                location.row(),
+                location.column(),
+                instructions.error()
+            );
+            auto const num_digits = static_cast<int>(std::to_string(location.row()).length());
+            auto const surrounding_line = location.surrounding_line();
+            fmt::println(std::cerr, "{} | {}", location.row(), surrounding_line);
+            auto const offset = std::distance(surrounding_line.data(), location.lexeme().data());
+            fmt::println(std::cerr, "{:{}} | {:>{}}{:~>{}}^", "", num_digits, "", offset, "", location.lexeme().length() - 1);
+        } else {
+            fmt::println(std::cerr, "Error: {}", instructions.error());
         }
-        instruction.value().encode(std::back_inserter(instruction_memory));
+        return EXIT_FAILURE;
+    }
+    auto instruction_memory = std::vector<std::byte>{};
+    for (auto const& instruction : instructions.value()) {
+        instruction.encode(std::back_inserter(instruction_memory));
     }
 
     fmt::println("Decoded memory:");

@@ -5,6 +5,7 @@
 #include <string_view>
 #include <tl/expected.hpp>
 #include <assembler/token.hpp>
+#include <vector>
 
 namespace assembler {
     class Lexer final {
@@ -15,13 +16,18 @@ namespace assembler {
         usize m_row = 1;
         usize m_column = 1;
         bool m_input_exhausted = false;
+        std::vector<Token> m_tokens;
 
     public:
         [[nodiscard]] explicit Lexer(std::string_view filename, std::string_view source);
 
-        [[nodiscard]] tl::expected<Token, Error> next_token();
+        [[nodiscard]] tl::expected<void, Error> tokenize();
+
+        [[nodiscard]] std::vector<Token> take() &&;
 
     private:
+        [[nodiscard]] tl::expected<Token, Error> next_token();
+
         [[nodiscard]] bool is_at_end() const;
 
         [[nodiscard]] char current() const;

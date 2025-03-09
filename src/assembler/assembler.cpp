@@ -2,16 +2,28 @@
 #include "parser.hpp"
 
 namespace assembler {
-    [[nodiscard]] Assembler::Assembler(std::string_view const filename, std::string_view const source)
-        : m_parser{ std::make_unique<Parser>(filename, source) } {}
-
-    Assembler::~Assembler() = default;
-
-    [[nodiscard]] tl::expected<::Instruction, Error> Assembler::next_instruction() {
-        auto const instruction = m_parser->next_instruction();
-        if (not instruction.has_value()) {
-            return tl::unexpected{ instruction.error() };
+    [[nodiscard]] tl::expected<std::vector<::Instruction>, Error> assemble(
+        std::string_view const filename,
+        std::string_view const source
+    ) {
+        auto lexer = Lexer{ filename, source };
+        if (auto const result = lexer.tokenize(); not result.has_value()) {
+            return tl::unexpected{ result.error() };
         }
-        return instruction.value().lower();
+        auto parser = Parser{ std::move(lexer).take() };
+        if (auto const result = parser.parse(); not result.has_value()) {
+            return tl::unexpected{ result.error() };
+        }
+        auto const instructions = std::move(parser).take();
+
+        auto result = std::vector<::Instruction>{};
+        for (auto const& instruction : instructions) {
+            auto lowered = instruction.lower();
+            if (not lowered.has_value()) {
+                return tl::unexpected{ lowered.error() };
+            }
+            result.push_back(std::move(lowered).value());
+        }
+        return result;
     }
 }  // namespace assembler

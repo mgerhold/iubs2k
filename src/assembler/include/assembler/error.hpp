@@ -7,29 +7,33 @@
 #include "token.hpp"
 
 namespace assembler {
-    struct InputExhausted {};
+    struct InputExhausted {
+        [[nodiscard]] friend char const* format_as(InputExhausted const&) {
+            return "Input exhausted.";
+        }
+    };
 
     struct InvalidChar final {
         SourceLocation source_location;
 
         [[nodiscard]] explicit InvalidChar(SourceLocation const& source_location)
             : source_location{ source_location } {}
-    };
 
-    [[nodiscard]] inline std::string format_as(InvalidChar const& error) {
-        return fmt::format("Invalid character: '{}'", error.source_location.lexeme());
-    }
+        [[nodiscard]] friend std::string format_as(InvalidChar const& error) {
+            return fmt::format("Invalid character: '{}'", error.source_location.lexeme());
+        }
+    };
 
     struct InvalidInteger final {
         SourceLocation source_location;
 
         [[nodiscard]] explicit InvalidInteger(SourceLocation const& source_location)
             : source_location{ source_location } {}
-    };
 
-    [[nodiscard]] inline std::string format_as(InvalidInteger const& error) {
-        return fmt::format("Invalid integer: '{}'", error.source_location.lexeme());
-    }
+        [[nodiscard]] friend std::string format_as(InvalidInteger const& error) {
+            return fmt::format("Invalid integer: '{}'", error.source_location.lexeme());
+        }
+    };
 
     struct UnexpectedToken final {
         Token token;
@@ -37,11 +41,11 @@ namespace assembler {
 
         [[nodiscard]] explicit UnexpectedToken(Token const& token, std::string message)
             : token{ token }, message{ std::move(message) } {}
-    };
 
-    [[nodiscard]] inline std::string format_as(UnexpectedToken const& error) {
-        return fmt::format("Unexpected token: '{}'. {}", error.token.lexeme(), error.message);
-    }
+        [[nodiscard]] friend std::string format_as(UnexpectedToken const& error) {
+            return fmt::format("Unexpected token: '{}'. {}", error.token.lexeme(), error.message);
+        }
+    };
 
     struct ArityMismatch final {
         Token mnemonic;
@@ -50,38 +54,38 @@ namespace assembler {
 
         [[nodiscard]] explicit ArityMismatch(Token const& mnemonic, usize const expected, usize const actual)
             : mnemonic{ mnemonic }, expected{ expected }, actual{ actual } {}
-    };
 
-    [[nodiscard]] inline std::string format_as(ArityMismatch const& error) {
-        return fmt::format(
-            "Arity mismatch for mnemonic '{}'. Expected {}, but got {}.",
-            error.mnemonic.lexeme(),
-            error.expected,
-            error.actual
-        );
-    }
+        [[nodiscard]] friend std::string format_as(ArityMismatch const& error) {
+            return fmt::format(
+                "Arity mismatch for mnemonic '{}'. Expected {}, but got {}.",
+                error.mnemonic.lexeme(),
+                error.expected,
+                error.actual
+            );
+        }
+    };
 
     struct InvalidOperands final {
         Token mnemonic;
 
         [[nodiscard]] explicit InvalidOperands(Token const& mnemonic)
             : mnemonic{ mnemonic } {}
-    };
 
-    [[nodiscard]] inline std::string format_as(InvalidOperands const& error) {
-        return fmt::format("Invalid operands for mnemonic '{}'.", error.mnemonic.lexeme());
-    }
+        [[nodiscard]] friend std::string format_as(InvalidOperands const& error) {
+            return fmt::format("Invalid operands for mnemonic '{}'.", error.mnemonic.lexeme());
+        }
+    };
 
     struct UnknownMnemonic final {
         Token mnemonic;
 
         [[nodiscard]] explicit UnknownMnemonic(Token const& mnemonic)
             : mnemonic{ mnemonic } {}
-    };
 
-    [[nodiscard]] inline std::string format_as(UnknownMnemonic const& error) {
-        return fmt::format("Unknown mnemonic: '{}'", error.mnemonic.lexeme());
-    }
+        [[nodiscard]] friend std::string format_as(UnknownMnemonic const& error) {
+            return fmt::format("Unknown mnemonic: '{}'", error.mnemonic.lexeme());
+        }
+    };
 
     // clang-format off
     using ErrorBase = std::variant<
@@ -119,9 +123,15 @@ namespace assembler {
             );
             // clang-format on
         }
-    };
 
-    [[nodiscard]] inline std::string format_as(Error const& error) {
-        return std::visit([](auto const& e) { return fmt::format("{}", e); }, error);
-    }
+        [[nodiscard]] friend std::string format_as(Error const& error) {
+            return std::visit(
+                [](auto const& e) {
+                    static_assert(requires { format_as(e); }, "Variant alternative must implement format_as().");
+                    return fmt::format("{}", e);
+                },
+                error
+            );
+        }
+    };
 }  // namespace assembler
